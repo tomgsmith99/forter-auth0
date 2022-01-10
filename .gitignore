@@ -1,4 +1,2 @@
-.env*
-!.env_example
-node_modules
-todo.txt
+action_debug.js
+login_debug.html
