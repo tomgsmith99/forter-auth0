@@ -53,7 +53,7 @@ exports.onExecutePostLogin = async (event, api) => {
 
   const config = {
     auth: {
-      username: event.secrets.FORTER_KEY
+      username: event.secrets.FORTER_KEY // make sure you store your Forter key in a safe place.
     },
     method: 'post',
     url: forter_url,

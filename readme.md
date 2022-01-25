@@ -1,7 +1,7 @@
 # Forter + Auth0 Integration #
 
 ## Overview ##
-This project enables you to easily include the power of Forter's [Trusted Identities]( https://www.forter.com/trusted-identities) in your Auth0 authentication flow.
+This project enables you to easily include the power of Forter's [Trusted Identities](https://www.forter.com/trusted-identities) in your Auth0 authentication flow.
 
 Forter's Trusted Identities is the most effective way to prevent ATO attempts against your end-users.
 
@@ -16,6 +16,8 @@ Based on its evaluation of the user context, Forter will recommend one of three 
 With the accuracy of Forter's AI-based decisions, you can greatly reduce the frequency of your MFA challenges, which of course reduces friction for your end-users.
 
 You can thus reduce friction for your end-users while at the same time increase the confidence that successful authentications are not bad actors.
+
+You can see a step-by-step depiction of the flow [here](https://tomgsmith99-images.s3.amazonaws.com/forter/forter_auth0.png).
 
 ### Key Elements ###
 
