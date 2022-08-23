@@ -27,7 +27,16 @@ exports.onExecutePostLogin = async (event, api) => {
   // or use the user's real ip address
   const ip = get_ip(email, event.request.ip)
 
-  let config, data, res
+  let config, data, res, login_context
+
+  /*****************************************/
+
+  if (event.authentication.methods[0].name == "federated") {
+    login_context = "social"
+  }
+  else {
+    login_context = "direct"
+  }
 
   /*****************************************/
   // is this the user's first login?
@@ -38,7 +47,8 @@ exports.onExecutePostLogin = async (event, api) => {
     // check with Forter to see if we need to mark the user record as "blocked"
     // and bounce the authn attempt
 
-    data = JSON.stringify({
+    //NOTE TO SELF: ADD login_method_type to login
+    data = {
       "accountId": accountId,
       "connectionInformation": {
         "customerIP": ip,
@@ -46,7 +56,40 @@ exports.onExecutePostLogin = async (event, api) => {
         "forterTokenCookie": event.request.query.forterToken
       },
       "eventTime": Date.now()
-    })
+    }
+
+    // is this a social registration?
+    // todo: add name mappings for other social providers
+
+    // if (login_context == "social") {
+
+    //   data.customerSignedInUsingSocialNetworkAccount = {}
+
+    //   if (event.connection.name == "google-oauth2") {
+    //     data.customerSignedInUsingSocialNetworkAccount = {
+    //       "google": true
+    //     }
+    //   }
+    //   else {
+    //     data.customerSignedInUsingSocialNetworkAccount = {
+    //       "otherSocialNetwork": "some_social_network"
+    //     }        
+    //   }
+    // }
+
+    // let c = {
+
+    //   method: 'post',
+    //   url: 'https://webhook.site/f8c087eb-0bf6-45e3-9acb-cb5e0c216cd1',
+    //   headers: { 
+    //     'Content-Type': 'application/json'
+    //   },
+    //   data: data
+    // }
+
+    // let r = await axios.request(c)
+
+    /*****************************************/
 
     config = {
       auth: {
@@ -58,7 +101,7 @@ exports.onExecutePostLogin = async (event, api) => {
         'api-version': '2.36', 
         'Content-Type': 'application/json'
       },
-      data: data
+      data: JSON.stringify(data)
     }
 
     res = await axios.request(config)
@@ -118,17 +161,25 @@ exports.onExecutePostLogin = async (event, api) => {
     // check with Forter to get a decision on the login attempt:
     // approve, decline, verify (MFA)
 
-    data = JSON.stringify({
+    // UPDATE LOGIN METHOD TYPE FOR SOCIAL
+
+    data = {
       "accountId": accountId,
       "connectionInformation": {
         "customerIP": ip,
         "userAgent": event.request.user_agent,
         "forterTokenCookie": event.request.query.forterToken
       },
-      "loginMethodType": "PASSWORD",
       "loginStatus": "SUCCESS",
       "eventTime": Date.now()
-    })
+    }
+
+    if (login_context == "social") {
+      data["loginMethodType"] = "SOCIAL"
+    }
+    else {
+      data["loginMethodType"] = "PASSWORD"
+    }
 
     config = {
       auth: {
