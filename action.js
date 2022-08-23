@@ -47,13 +47,17 @@ exports.onExecutePostLogin = async (event, api) => {
     // check with Forter to see if we need to mark the user record as "blocked"
     // and bounce the authn attempt
 
-    //NOTE TO SELF: ADD login_method_type to login
     data = {
       "accountId": accountId,
       "connectionInformation": {
         "customerIP": ip,
         "userAgent": event.request.user_agent,
         "forterTokenCookie": event.request.query.forterToken
+      },
+      "accountData": {
+        "personalDetails": {
+          "email": event.user.email
+        }
       },
       "eventTime": Date.now()
     }
@@ -77,18 +81,6 @@ exports.onExecutePostLogin = async (event, api) => {
     //   }
     // }
 
-    // let c = {
-
-    //   method: 'post',
-    //   url: 'https://webhook.site/f8c087eb-0bf6-45e3-9acb-cb5e0c216cd1',
-    //   headers: { 
-    //     'Content-Type': 'application/json'
-    //   },
-    //   data: data
-    // }
-
-    // let r = await axios.request(c)
-
     /*****************************************/
 
     config = {
@@ -98,7 +90,7 @@ exports.onExecutePostLogin = async (event, api) => {
       method: 'post',
       url: `${forter_url_base}/signup/${accountId}`,
       headers: { 
-        'api-version': '2.36', 
+        'api-version': event.secrets.FORTER_API_VERSION, 
         'Content-Type': 'application/json'
       },
       data: JSON.stringify(data)
@@ -161,8 +153,6 @@ exports.onExecutePostLogin = async (event, api) => {
     // check with Forter to get a decision on the login attempt:
     // approve, decline, verify (MFA)
 
-    // UPDATE LOGIN METHOD TYPE FOR SOCIAL
-
     data = {
       "accountId": accountId,
       "connectionInformation": {
@@ -188,7 +178,7 @@ exports.onExecutePostLogin = async (event, api) => {
       method: 'post',
       url: `${forter_url_base}/login/${encoded_account_id}`,
       headers: { 
-        'api-version': '2.36', 
+        'api-version': event.secrets.FORTER_API_VERSION, 
         'Content-Type': 'application/json'
       },
       data: data
