@@ -1,5 +1,5 @@
 const axios = require('axios')
-// Later-on we can move those to np,
+// Later-on we can move those to npm,
 const ENUMS = {
     FORTER_DECISION: {
         DECLINE: 'DECLINE',
