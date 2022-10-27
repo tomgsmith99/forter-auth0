@@ -1,6 +1,9 @@
 const axios = require('axios')
 // Later-on we can move those to np,
 const ENUMS = {
+    LOGIN_STATUS: {
+        SUCCESS: 'SUCCESS'
+    },
     FORTER_DECISION: {
         DECLINE: 'DECLINE',
         APPROVE: 'APPROVE',
@@ -8,11 +11,13 @@ const ENUMS = {
     },
     HEADERS_NAMES: {
         CONTENT_TYPE: 'Content-Type',
-        AUTHORIZATION: 'Authorization'
+        AUTHORIZATION: 'Authorization',
+        FORTER_API_VERSION: 'api-version',
+        FORTER_CLIENT: 'x-forter-client'
     },
     HEADERS_VALUES: {
         APP_JSON: 'application/json',
-        FORTER_API_VERSION: 'api-version'
+        AUTH0: 'auth0',
     },
     HTTP_METHODS: {
         POST: 'post',
@@ -32,6 +37,10 @@ const ENUMS = {
     EVENT_TYPES: {
         SIGN_IN: 'login',
         SIGN_UP: 'signup'
+    },
+    LOGIN_TYPES: {
+        SOCIAL: 'SOCIAL',
+        PASSWORD: 'PASSWORD',
     }
 }
 
@@ -56,7 +65,7 @@ class Auth0Client {
             audience: `${this.AUTH0_TENANT}/api/v2/`,
             grant_type: ENUMS.GRANT_TYPES.CLIENT_CREDENTIALS
         });
-        return await axios.request({
+        const {data: {access_token: accessToken}} = await axios.request({
             method: ENUMS.HTTP_METHODS.POST,
             url: `${this.AUTH0_TENANT}/oauth/token`,
             headers: {
@@ -64,21 +73,22 @@ class Auth0Client {
             },
             data
         });
+        return accessToken;
     }
 
     /**
      * Block user access given an accessToken and the accountId
-     * @param encodedAccountId
+     * @param accountId
      * @param accessToken
      * @returns {Promise<*>}
      */
-    async blockedAccess({encodedAccountId, accessToken}) {
+    async blockedAccess({accountId, accessToken}) {
         const data = JSON.stringify({
             blocked: true
         });
         return await axios.request({
             method: ENUMS.HTTP_METHODS.PATCH,
-            url: `${this.AUTH0_TENANT}/api/v2/users/${encodedAccountId}`,
+            url: `${this.AUTH0_TENANT}/api/v2/users/${accountId}`,
             headers: {
                 [ENUMS.HEADERS_NAMES.AUTHORIZATION]: `Bearer  ${accessToken}`,
                 [ENUMS.HEADERS_NAMES.CONTENT_TYPE]: ENUMS.HEADERS_VALUES.APP_JSON
@@ -120,15 +130,15 @@ class ForterClient {
     }
     // Core API
     /**
-     * Get Forter Decision for Sign In
+     * Get Forter Decision for Sing Up event
      * @param accountId
      * @param userAgent
      * @param forterTokenCookie
      * @param customerIP
-     * @param eventType
-     * @returns {Promise<*>}
+     * @param email
+     * @returns forterDecision
      */
-    async getDecisionForEvent({accountId, userAgent, forterTokenCookie, customerIP, eventType}) {
+    async getSignUpDecision({accountId, userAgent, forterTokenCookie, customerIP, email}) {
         const eventTime = Date.now();
         const data = JSON.stringify({
             accountId,
@@ -137,18 +147,59 @@ class ForterClient {
                 userAgent,
                 forterTokenCookie
             },
-            eventTime
+            eventTime,
         });
-        return await axios.request({
-            url: `${this.forterBaseUrl}/${eventType}/${accountId}`,
+
+        const { data: { forterDecision } } = await axios.request({
+            url: `${this.forterBaseUrl}/${ENUMS.EVENT_TYPES.SIGN_UP}/${accountId}`,
             method: ENUMS.HTTP_METHODS.POST,
             auth: this.auth,
             headers: {
-                [ENUMS.HEADERS_NAMES.FORTER_API_VERSION]: this.FORTER_API_VERSION,
-                [ENUMS.HEADERS_NAMES.CONTENT_TYPE]: ENUMS.HEADERS_VALUES.APP_JSON
+                [ENUMS.HEADERS_NAMES.FORTER_API_VERSION]: `${this.FORTER_API_VERSION}`,
+                [ENUMS.HEADERS_NAMES.CONTENT_TYPE]: ENUMS.HEADERS_VALUES.APP_JSON,
+                [ENUMS.HEADERS_NAMES.FORTER_CLIENT]: ENUMS.HEADERS_VALUES.AUTH0
             },
             data
         });
+        return forterDecision;
+    }
+
+    /**
+     * Get Forter Decision for Sing In event
+     * @param accountId
+     * @param userAgent
+     * @param forterTokenCookie
+     * @param customerIP
+     * @param email
+     * @param loginMethodType
+     * @returns forterDecision
+     */
+    async getSignInDecision({accountId, userAgent, forterTokenCookie, customerIP, email, loginMethodType}) {
+        const eventTime = Date.now();
+        const data = JSON.stringify({
+            accountId,
+            loginStatus: ENUMS.LOGIN_STATUS.SUCCESS,
+            loginMethodType,
+            connectionInformation: {
+                customerIP,
+                userAgent,
+                forterTokenCookie
+            },
+            eventTime,
+        });
+
+        const { data: { forterDecision } } = await axios.request({
+            url: `${this.forterBaseUrl}/${ENUMS.EVENT_TYPES.SIGN_IN}/${accountId}`,
+            method: ENUMS.HTTP_METHODS.POST,
+            auth: this.auth,
+            headers: {
+                [ENUMS.HEADERS_NAMES.FORTER_API_VERSION]: `${this.FORTER_API_VERSION}`,
+                [ENUMS.HEADERS_NAMES.CONTENT_TYPE]: ENUMS.HEADERS_VALUES.APP_JSON,
+                [ENUMS.HEADERS_NAMES.FORTER_CLIENT]: ENUMS.HEADERS_VALUES.AUTH0
+            },
+            data
+        });
+        return forterDecision;
     }
 
     // Helpers
@@ -159,6 +210,10 @@ class ForterClient {
      */
     static isFirstEvent(event) {
         return event.stats.logins_count === 1;
+    }
+
+    static getLoginMethodTypeFromEvent(event) {
+        return event.authentication.methods[0].name === "federated" ? ENUMS.LOGIN_TYPES.SOCIAL : ENUMS.LOGIN_TYPES.PASSWORD;
     }
 }
 
@@ -177,39 +232,42 @@ class ForterClient {
  * FORTER_API_VERSION: Forter API Version
  * FORTER_SITE_ID: Forter Site ID
  * FORTER_KEY: Forter Key
- * ---- General Variables ----
- * IS_TEST_MODE: TRUE ONLY if on testing mode
  *
  */
 exports.onExecutePostLogin = async (event, api) => {
-    // Extract general variables
-    const {IS_TEST_MODE} = event.secrets;
-    // Extract data from user & request
-    const {accountId = user_id, email} = event.user;
+    const {user_id, email} = event.user;
     const {customerIP: ip, user_agent: userAgent, query: {forterToken: forterTokenCookie}} = event.request;
-    // Format accountId and customerIp
-    const encodedAccountId = encodeURI(accountId);
-    const customerIP = IS_TEST_MODE ? Auth0Client.getTestIpByEmail(ip, email) : ip;
-    // New API instances
     const forterClient = new ForterClient(event.secrets);
     const auth0Client = new Auth0Client(event.secrets);
+    const accountId = encodeURI(user_id);
+    const customerIP = Auth0Client.getTestIpByEmail(ip, email);
 
     if (ForterClient.isFirstEvent(event)) {
-        // Get sign-up decision from Forter
-        const forterDecision = await forterClient.getDecisionForEvent({accountId, userAgent, forterTokenCookie, customerIP, eventType: ENUMS.EVENT_TYPES.SIGN_UP});
+        // Sign up
+        const forterDecision = await forterClient.getSignUpDecision({
+            accountId,
+            userAgent,
+            forterTokenCookie,
+            customerIP,
+            email,
+        });
         if (forterDecision === ENUMS.FORTER_DECISION.DECLINE) {
-            // 1. get an Auth0 access token
-            const {data: {access_token: accessToken}} = await auth0Client.getAccessToken();
-            // 2. Block user
-            await auth0Client.blockedAccess({encodedAccountId, accessToken});
-            // 3. Bounce the user's login attempt
+            const accessToken = await auth0Client.getAccessToken();
+            await auth0Client.blockedAccess({accountId, accessToken});
             api.access.deny(ENUMS.MESSAGES.ACCESS_DENY);
         }
-        // Otherwise?
-        // MFA On signup ?
+        // Otherwise -> continue
     } else {
+        const loginMethodType = ForterClient.getLoginMethodTypeFromEvent(event);
         // Sing In
-        const forterDecision = forterClient.getDecisionForEvent({accountId, userAgent, forterTokenCookie, customerIP, eventType: ENUMS.EVENT_TYPES.SIGN_IN});
+        const forterDecision = await forterClient.getSignInDecision({
+            accountId,
+            userAgent,
+            forterTokenCookie,
+            loginMethodType,
+            customerIP,
+            email
+        });
         // Decline
         if (forterDecision === ENUMS.FORTER_DECISION.DECLINE) {
             api.access.deny(ENUMS.MESSAGES.ACCESS_DENY);
@@ -220,8 +278,20 @@ exports.onExecutePostLogin = async (event, api) => {
         }
         // Otherwise -> Approve, continue as usual
     }
-    // TODO: Handle error: send MFA?
-    // TODO: Social?
-    // TODO: Tests?
-    // TODO: Fetch instead of axios?
 }
+
+
+// TODO: Error handling -> single rety with a short sleep, otherwise -> fallback based on merchant config - MFA DEFAULT
+// TODO: ADD email VALUE !
+// TODO: ADD in login Created date/Other analytical fields of the account
+// TODO: Create a private Forter repo
+// TODO: rename forterToken
+
+// TODO: Switch to email instead of IP - DOR team
+// TODO: Link to 'https://portal.forter.com/app/developer/settings/auth0' from the docs + change the fields to the auth0 + have screenshots/gif of how to do it
+// TODO: HTML refactor
+// TODO: ADD Forter JAVASCRIPT --> link to the portal - diff keys from sandbox and production need to explain
+
+// TODO: ADD verifed email event
+// TODO: Handle error: send MFA?
+// TODO: adding Tests ?

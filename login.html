@@ -17,8 +17,9 @@
   <script src="https://cdn.auth0.com/js/es5-shim.min.js"></script>
   <![endif]-->
 
-  <!-- Forter js -->
   <script>
+
+
 
     document.addEventListener('ftr:tokenReady', function(evt) {
       var forterToken = evt.detail
@@ -47,7 +48,7 @@
 
       /**************************************************/
       // this line is the key addition to the Auth0 js
-      config.internalOptions["forterToken"] = forterToken;
+      config.internalOptions["forterToken"] = forterToken; // TODO: rename to token
       /**************************************************/
 
       // Available Lock configuration options: https://auth0.com/docs/libraries/lock/v11/configuration

@@ -13,7 +13,7 @@ exports.onExecutePostLogin = async (event, api) => {
 
   const FORTER_TENANT_ID = event.secrets.FORTER_TENANT_ID
 
-  const forter_url_base = `https://${FORTER_TENANT_ID}.api.forter-secure.com/v2/accounts` 
+  const forter_url_base = `https://${FORTER_TENANT_ID}.api.forter-secure.com/v2/accounts`
 
   const accountId = event.user.user_id
 
@@ -77,7 +77,7 @@ exports.onExecutePostLogin = async (event, api) => {
     //   else {
     //     data.customerSignedInUsingSocialNetworkAccount = {
     //       "otherSocialNetwork": "some_social_network"
-    //     }        
+    //     }
     //   }
     // }
 
@@ -89,8 +89,8 @@ exports.onExecutePostLogin = async (event, api) => {
       },
       method: 'post',
       url: `${forter_url_base}/signup/${accountId}`,
-      headers: { 
-        'api-version': event.secrets.FORTER_API_VERSION, 
+      headers: {
+        'api-version': event.secrets.FORTER_API_VERSION,
         'Content-Type': 'application/json'
       },
       data: JSON.stringify(data)
@@ -112,8 +112,8 @@ exports.onExecutePostLogin = async (event, api) => {
       config = {
         method: 'post',
         url: event.secrets.AUTH0_TENANT + '/oauth/token',
-        headers: { 
-          'Content-Type': 'application/json', 
+        headers: {
+          'Content-Type': 'application/json',
         },
         data : data
       }
@@ -132,7 +132,7 @@ exports.onExecutePostLogin = async (event, api) => {
       config = {
         method: 'patch',
         url: event.secrets.AUTH0_TENANT + '/api/v2/users/' + encoded_account_id,
-        headers: { 
+        headers: {
           'Authorization': 'Bearer ' + access_token,
           'Content-Type': 'application/json'
         },
@@ -177,8 +177,8 @@ exports.onExecutePostLogin = async (event, api) => {
       },
       method: 'post',
       url: `${forter_url_base}/login/${encoded_account_id}`,
-      headers: { 
-        'api-version': event.secrets.FORTER_API_VERSION, 
+      headers: {
+        'api-version': event.secrets.FORTER_API_VERSION,
         'Content-Type': 'application/json'
       },
       data: data
